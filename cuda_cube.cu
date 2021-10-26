@@ -1,39 +1,40 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-__global__ void multAdd(float* d_out, float* d_in)
+__global__ void multAdd(float *d_in, float *d_out)
 {
-    int idx = threadidx.x;
-    int f = d_in(idx);
-    d_out(idx) = ((2*f) + 1);
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int f = d_in[idx];
+    d_out[idx] = ((2*f) + 1);
 }
 
 
-int main(int argc, int** argv)
+int main(int argc, char** argv)
 {
     int ARRAY_SIZE = 128;
     int ARRAY_MEM = ARRAY_SIZE*sizeof(float);
 
-    float* h_in = malloc(ARRAY_MEM);
-    float* h_out = malloc(ARRAY_MEM);
+    float* h_in = (float*)malloc(ARRAY_MEM);
+    float* h_out = (float*)malloc(ARRAY_MEM);
+    float *d_out, *d_in;
 
     for(int i = 0; i < ARRAY_SIZE; i++)
     {
-        h_in(i) = float(i);
+        h_in[i] = i;
     }
 
     cudaMalloc(&d_in, ARRAY_MEM);
     cudaMalloc(&d_out, ARRAY_MEM);
 
-    cudaMemCpy(h_in, d_in, ARRAY_SIZE, cudaMemCpyHostToDevice);
+    cudaMemcpy(d_in, h_in, ARRAY_MEM, cudaMemcpyHostToDevice);
     
-    multadd<<<1, 128>>> (d_in, d_out);
+    multAdd<<<1, 128>>>(d_in, d_out);
     
-    cudaMemCpy(d_out, h_out, ARRAY_SIZE, cudaMemCpyDeviceToHost);
+    cudaMemcpy(h_out, d_out, ARRAY_MEM, cudaMemcpyDeviceToHost);
 
-    for(int i = 0; i < ARRAY_SIZE; i++)
+    for(int i = 0; i < ARRAY_SIZE; i += 4)
     {
-        printf("%f\n", h_out(i));
+        printf("%10f %10f %10f %10f\n", h_out[i], h_out[i+1], h_out[i+2], h_out[i+3]);
     }
     
     cudaFree(d_in);
