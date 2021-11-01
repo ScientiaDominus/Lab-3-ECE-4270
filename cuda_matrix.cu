@@ -1,12 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-__global__ void MatrixAdd(float** d_out, float** d_in1, float** d_in2)
+__global__ void MatrixAdd(float* d_out, float* d_in1, float* d_in2, int M, int N)
 {
-    int idx = threadIdx.x;
-    int f = d_in1[idx];
-    int g = d_in2[idx];
-    d_out[idx] = f + g;
+    int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    float f = d_in1[idx];
+    float g = d_in2[idx];
+    if(blockIdx.x < M && threadIdx.x < N)
+    {
+        d_out[idx] = f + g;
+    }
 }
 
 int main(int argc, char* argv[])
@@ -39,44 +42,45 @@ int main(int argc, char* argv[])
         fclose(fp);
         exit(1);
     }
-    int MATRIX_SIZE = 0;
-    fscanf(fp, "%f", &MATRIX_SIZE);
-    int MATRIXMEM = (MATRIX_SIZE*MATRIX_SIZE) * sizeof(float);
-    float **h_in1;
-    h_in1 = (float**)malloc(MATRIXMEM);
-    for(int x = 0; x < MATRIX_SIZE; x++)
+    int M, N;
+    M = N = 0;
+    fscanf(fp, "%d %d", &M, &N);
+    int MATRIXMEM = (M*N) * sizeof(float);
+    float *h_in1;
+    h_in1 = (float*)malloc(MATRIXMEM);
+    for(int x = 0; x < M; x++)
     {
-        for(int y = 0; y < MATRIX_SIZE; y++)
+        for(int y = 0; y < N; y++)
         {
-            h_in1[x][y] = 0;
+            h_in1[x*N + y] = 0;
         }
     }
-    for(int x = 0; x < MATRIX_SIZE; x++)
+    for(int x = 0; x < M; x++)
     {
-        for(int y = 0; y < MATRIX_SIZE; y++)
+        for(int y = 0; y < N; y++)
         {
-            fscanf(fp, "%d", &h_in1[x][y]);
+            fscanf(fp, "%f", &h_in1[x*N + y]);
         }
     }
-    fscanf(fp, "%f", &MATRIX_SIZE);
-    float** h_in2;
-    h_in2 = (float**)malloc(MATRIXMEM);
-    for(int x = 0; x < MATRIX_SIZE; x++)
+    fscanf(fp, "%d %d", &M, &N);
+    float* h_in2;
+    h_in2 = (float*)malloc(MATRIXMEM);
+    for(int x = 0; x < M; x++)
     {
-        for(int y = 0; y < MATRIX_SIZE; y++)
+        for(int y = 0; y < N; y++)
         {
-            h_in2[x][y] = 0;
+            h_in2[x*N + y] = 0;
         }
     }
-    for(int x = 0; x < MATRIX_SIZE; x++)
+    for(int x = 0; x < M; x++)
     {
-        for(int y = 0; y < MATRIX_SIZE; y++)
+        for(int y = 0; y < N; y++)
         {
-            fscanf(fp, "%d", &h_in2[x][y]);
+            fscanf(fp, "%f", &h_in2[x*N + y]);
         }
     }
-    float** h_out = (float*)malloc(MATRIXMEM);
-    float** d_out, d_in1, d_in2;
+    float* h_out = (float*)malloc(MATRIXMEM);
+    float *d_out, *d_in1, *d_in2;
     cudaMalloc(&d_in1, MATRIXMEM);
     cudaMalloc(&d_in2, MATRIXMEM);
     cudaMalloc(&d_out, MATRIXMEM);
@@ -84,24 +88,16 @@ int main(int argc, char* argv[])
     cudaMemcpy(d_in1, h_in1, MATRIXMEM, cudaMemcpyHostToDevice);
     cudaMemcpy(d_in2, h_in2, MATRIXMEM, cudaMemcpyHostToDevice);
 
-    MatrixAdd<<<1, 10>>>(d_out, d_in1, d_in2);
-    MatrixAdd<<<11, 20>>>(d_out, d_in1, d_in2);
-    MatrixAdd<<<21, 30>>>(d_out, d_in1, d_in2);
-    MatrixAdd<<<31, 40>>>(d_out, d_in1, d_in2);
-    MatrixAdd<<<41, 50>>>(d_out, d_in1, d_in2);
-    MatrixAdd<<<51, 60>>>(d_out, d_in1, d_in2);
-    MatrixAdd<<<61, 70>>>(d_out, d_in1, d_in2);
-    MatrixAdd<<<71, 80>>>(d_out, d_in1, d_in2);
-    MatrixAdd<<<81, 90>>>(d_out, d_in1, d_in2);
-    MatrixAdd<<<91, 100>>>(d_out, d_in1, d_in2);
+    MatrixAdd<<<M, N>>>(d_out, d_in1, d_in2, M, N);
+
 
     cudaMemcpy(h_out, d_out, MATRIXMEM, cudaMemcpyDeviceToHost);
 
-    for(int x = 0; x < MATRIX_SIZE; x++)
+    for(int x = 0; x < M; x++)
     {
-        for(int y = 0; y < MATRIX_SIZE; y++)
+        for(int y = 0; y < N; y++)
         {
-            printf("%5f", h_out[x][y]);
+            printf("%12f ", h_out[x*N + y]);
         }
         printf("\n");
     }
